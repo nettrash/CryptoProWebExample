@@ -1,0 +1,31 @@
+﻿@{
+	ViewBag.Title = "Home and Sign Example";
+}
+
+<div class="jumbotron">
+	<h1>CryptoPro Web Example: Sign text example</h1>
+	<p class="lead">To use this app you must install a CryptoPro Plugin browser extension.</p>
+	<p><a href="https://www.cryptopro.ru/products/cades/plugin" target="_blank" class="btn btn-primary btn-lg">Click to Install &raquo;</a></p>
+</div>
+
+@section Scripts {
+	<script type="text/javascript">
+		$(document).ready(function () {
+			NETTRASH.Initialize();
+			NETTRASH.FillCertificates($('#certificateToSign'));
+    });
+	</script>
+}
+
+<div class="row">
+	<div class="col-md-2">&nbsp;</div>
+	<div class="col-md-8">
+		<h3>Browser Sign Example</h3>
+		<form>
+			<select id="certificateToSign" class="form-control col-md-12"></select>
+			<textarea id="textToSign" class="form-control col-md-12" rows="10" placeholder="Some text to sign"></textarea>
+			<button type="button" class="btn btn-success col-md-12" onclick="NETTRASH.SignText($('#textToSign').val(), $('#certificateToSign').val(), $('#signedText'))">Sign text</button>
+		</form>
+		<textarea id="signedText" class="form-control col-md-12" rows="10" placeholder="Sign text result" readonly></textarea>
+	</div>
+</div>

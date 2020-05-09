@@ -1,0 +1,35 @@
+﻿@{
+	ViewBag.Title = "Encrypt Example";
+}
+
+<div class="jumbotron">
+	<h1>CryptoPro Web Example: Encrypt example</h1>
+	<p class="lead">To use this app you must install a CryptoPro Plugin browser extension.</p>
+	<p><a href="https://www.cryptopro.ru/products/cades/plugin" target="_blank" class="btn btn-primary btn-lg">Click to Install &raquo;</a></p>
+</div>
+
+@section Scripts {
+	<script type="text/javascript">
+		$(document).ready(function () {
+			NETTRASH.Initialize();
+			NETTRASH.FillCertificates($('#senderCertificte'));
+			NETTRASH.FillCertificates($('#receiverCertificte'));
+    });
+	</script>
+}
+
+<div class="row">
+	<div class="col-md-8">
+		<h3>Browser Encrypt Example</h3>
+		<form>
+			<div class="form-group">
+				<label class="form-control" for="senderCertificate">Sender:</label>
+				<select id="senderCertificte" class="form-control col-md-12"></select>
+			</div>
+			<select id="receiverCertificte" class="form-control col-md-12"></select>
+			<textarea id="textToEncrypt" class="form-control col-md-12" rows="10" placeholder="Some text to encrypt"></textarea>
+			<button type="button" class="btn btn-success col-md-12" onclick="NETTRASH.EncryptText($('#textToEncrypt').val(), $('#senderCertificte').val(), $('#receiverCertificte').val(), $('#encryptedText'))">Encrypt text</button>
+		</form>
+		<textarea id="signedText" class="form-control col-md-12" rows="10" placeholder="Encrypted text" readonly></textarea>
+	</div>
+</div>
