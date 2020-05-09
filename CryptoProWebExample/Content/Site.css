@@ -43,3 +43,7 @@ button {
 textarea {
 	resize: vertical;
 }
+
+.input-group .form-control {
+	margin: 0px !important;
+}

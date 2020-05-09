@@ -436,6 +436,56 @@
             ovr.style.visibility="visible";
         }
     }
+
+
+    //Выводим окно поверх других с предложением установить расширение для Opera.
+    //Если установленна переменная cadesplugin_skip_extension_install - не предлагаем установить расширение
+    function install_opera_extension()
+    {
+        if (!window.cadesplugin_skip_extension_install)
+        {
+            document.addEventListener('DOMContentLoaded', function() {
+                var ovr = document.createElement('div');
+                ovr.id = "cadesplugin_ovr";
+                ovr.style = "visibility: hidden; position: fixed; left: 0px; top: 0px; width:100%; height:100%; background-color: rgba(0,0,0,0.7)";
+                ovr.innerHTML = "<div id='cadesplugin_ovr_item' style='position:relative; width:400px; margin:100px auto; background-color:#fff; border:2px solid #000; padding:10px; text-align:center; opacity: 1; z-index: 1500'>" +
+                    "<button id='cadesplugin_close_install' style='float: right; font-size: 10px; background: transparent; border: 1; margin: -5px'>X</button>" +
+                    "<p>Для работы КриптоПро ЭЦП Browser plugin на данном сайте необходимо установить расширение из каталога дополнений Opera." +
+                    "<p><button id='cadesplugin_install' style='font:12px Arial'>Установить расширение</button></p>" +
+                    "</div>";
+                document.getElementsByTagName("Body")[0].appendChild(ovr);
+                var btn_install = document.getElementById("cadesplugin_install");
+                btn_install.addEventListener('click', function(event) {
+                    opr.addons.installExtension("epebfcehmdedogndhlcacafjaacknbcm",
+                        function()
+                        {
+                            document.getElementById("cadesplugin_ovr").style.visibility = 'hidden';
+                            location.reload();
+                        },
+                        function(){})
+                });
+                document.getElementById("cadesplugin_close_install").addEventListener('click',function()
+                {
+                    plugin_loaded_error("Плагин недоступен");
+                    document.getElementById("cadesplugin_ovr").style.visibility = 'hidden';
+                });
+
+                ovr.addEventListener('click',function()
+                {
+                    plugin_loaded_error("Плагин недоступен");
+                    document.getElementById("cadesplugin_ovr").style.visibility = 'hidden';
+                });
+                ovr.style.visibility="visible";
+                document.getElementById("cadesplugin_ovr_item").addEventListener('click',function(e){
+                    e.stopPropagation();
+                });
+            });
+        }else
+        {
+            plugin_loaded_error("Плагин недоступен");
+        }
+    }
+
     function firefox_or_edge_nmcades_onload() {
         cpcsp_chrome_nmcades.check_chrome_plugin(plugin_loaded, plugin_loaded_error);
     }
@@ -532,6 +582,11 @@
             failed_extensions++;
             if(failed_extensions<2)
                 return;
+            if(isOpera && (typeof(msg) === 'undefined'|| typeof(msg) === 'object'))
+            {
+                install_opera_extension();
+                return;
+            }
         }
         if(typeof(msg) === 'undefined' || typeof(msg) === 'object')
             msg = "Плагин недоступен";
@@ -643,7 +698,7 @@
     };
 
     //Export
-    cadesplugin.JSModuleVersion = "2.2.0";
+    cadesplugin.JSModuleVersion = "2.1.2";
     cadesplugin.async_spawn = async_spawn;
     cadesplugin.set = set_pluginObject;
     cadesplugin.set_log_level = set_log_level;

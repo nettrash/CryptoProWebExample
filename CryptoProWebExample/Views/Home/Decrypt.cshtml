@@ -1,0 +1,62 @@
+﻿@{
+	ViewBag.Title = "Exchange Example";
+}
+
+<div class="jumbotron">
+	<h1>Decrypt example</h1>
+	<p class="lead">To use this app you must install a CryptoPro Plugin browser extension.</p>
+	<p><a href="https://www.cryptopro.ru/products/cades/plugin" target="_blank" class="btn btn-primary btn-lg">Click to Install &raquo;</a></p>
+</div>
+
+@section Scripts {
+	<script type="text/javascript">
+		$(document).ready(function () {
+			NETTRASH.Initialize();
+			NETTRASH.FillCertificates($('#certificate'));
+		});
+	</script>
+}
+
+<div class="row">
+	<div class="col-md-5">
+		<h3>Browser Decrypt Example</h3>
+		<form>
+			<div class="form-group">
+				<div class="input-group">
+					<div class="input-group-addon">PRIVATE KEY</div>
+					<select id="certificate" class="form-control col-md-12"></select>
+				</div>
+			</div>
+			<div class="form-group">
+				<div class="input-group">
+					<div class="input-group-addon">SESSION KEY DIVERS DATA</div>
+					<input type="text" id="sessionKeyDiversData" class="form-control col-md-12"></input>
+				</div>
+			</div>
+			<div class="form-group">
+				<div class="input-group">
+					<div class="input-group-addon">SESSION KEY IV</div>
+					<input type="text" id="sessionKeyIV" class="form-control col-md-12"></input>
+				</div>
+			</div>
+			<div class="form-group">
+				<div class="input-group">
+					<div class="input-group-addon">ENCRYPTED DATA</div>
+					<input type="text" id="dataEncrypted" class="form-control col-md-12"></input>
+				</div>
+			</div>
+			<div class="form-group">
+				<div class="input-group">
+					<div class="input-group-addon">ENCRYPTED SESSION KEY</div>
+					<input type="text" id="encryptedSessionKey" class="form-control col-md-12"></input>
+				</div>
+			</div>
+
+			<button type="button" class="btn btn-success col-md-12" onclick="NETTRASH.DecryptText({sessionKeyDiversData: $('#sessionKeyDiversData').val(),sessionKeyIV: $('#sessionKeyIV').val(),dataEncrypted: $('#dataEncrypted').val(),encryptedSessionKey: $('#encryptedSessionKey').val()}, $('#certificate').val(), $('#decryptedText'))">Decrypt text</button>
+		</form>
+	</div>
+	<div class="col-md-7">
+		<h3>&nbsp;</h3>
+		<textarea id="decryptedText" class="form-control col-md-12" rows="18" placeholder="Decrypted text" readonly style="margin-top:-2px;"></textarea>
+	</div>
+</div>

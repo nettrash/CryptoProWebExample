@@ -1,7 +1,7 @@
 ﻿(function (m, $, undefined) {
 
-	NETTRASH.isCryptoProPluginLoaded = false;
-	NETTRASH.isCryptoProPluginEnabled = false;
+	var isCryptoProPluginLoaded = false;
+	var isCryptoProPluginEnabled = false;
 
 	NETTRASH.Initialize = function () {
 		console.log("NETTRASH.Initialized");
@@ -51,13 +51,138 @@
 					alert("Error while reading certificates: " + cadesplugin.getLastError(ex));
 					return;
 				}
-				console.log(oCertificate.SubjectName);
 				var oItem = new Option(oCertificate.SubjectName, oCertificate.Thumbprint);
 				oItem.text = oCertificate.SubjectName;
 				$(eSelect).append(oItem);
 			}
 			oStore.Close();
 		}
+	}
+
+	NETTRASH.FindCertificateByThumbprint = function (oStore, sThumbprint) {
+		var nCertCount = oStore.Certificates.Count;
+		for (var i = 1; i <= nCertCount; i++) {
+			var oCertificate;
+			try {
+				oCertificate = oStore.Certificates.Item(i);
+			}
+			catch (ex) {
+				alert("Error while reading certificates: " + cadesplugin.getLastError(ex));
+				return;
+			}
+			if (oCertificate.Thumbprint === sThumbprint) break;
+		}
+		return oCertificate;
+	}
+
+	NETTRASH.DoEncrypt = function (sTextToEncrypt, sThumbprint) {
+
+		var result = {
+			success: false,
+			sessionKeyDiversData: "",
+			sessionKeyIV: "",
+			dataEncrypted: "",
+			encryptedSessionKey: "",
+			errorMessage: ""
+		};
+
+		try {
+			var oStore = cadesplugin.CreateObject("CAdESCOM.Store");
+			oStore.Open();
+		}
+		catch (ex) {
+			console.log("Certificates store My is not accessible");
+			result.errorMessage = "Certificates store My is not accessible";
+			return result;
+		}
+
+		var oCertificate = NETTRASH.FindCertificateByThumbprint(oStore, sThumbprint);
+
+		var sDataToEncrypt = Base64.encode(sTextToEncrypt);
+
+		if (sDataToEncrypt === "") {
+			console.log("Empty data to encrypt");
+			oStore.Close();
+			result.errorMessage = "Empty data to encrypt";
+			return result;
+		}
+
+		try {
+			try {
+				var oSymAlgo = cadesplugin.CreateObject("cadescom.symmetricalgorithm");
+			} catch (oError) {
+				console.log("Failed to create cadescom.symmetricalgorithm: " + oError);
+				oStore.Close();
+				result.errorMessage = "Failed to create cadescom.symmetricalgorithm: " + oError;
+				return result;
+			}
+
+			oSymAlgo.GenerateKey();
+
+			var oSessionKey = oSymAlgo.DiversifyKey();
+			result.sessionKeyDiversData = oSessionKey.DiversData;
+			result.sessionKeyIV = oSessionKey.IV;
+			result.dataEncrypted = oSessionKey.Encrypt(sDataToEncrypt, 1);
+			result.encryptedSessionKey = oSymAlgo.ExportKey(oCertificate);
+
+			result.success = true;
+			console.log("Data encrypted");
+		}
+		catch (oError) {
+			console.log(oError);
+			result.errorMessage = oError;
+		}
+
+		oStore.Close();
+
+		return result;
+	}
+
+	NETTRASH.DoDecrypt = function (oEncryptedData, sThumbprint) {
+		var result = {
+			success: false,
+			message: ""
+		};
+
+		try {
+			var oStore = cadesplugin.CreateObject("CAdESCOM.Store");
+			oStore.Open();
+		}
+		catch (ex) {
+			console.log("Certificates store My is not accessible");
+			return result;
+		}
+
+		var oCertificate = NETTRASH.FindCertificateByThumbprint(oStore, sThumbprint);
+
+		try {
+			try {
+				var oSymAlgo = cadesplugin.CreateObject("cadescom.symmetricalgorithm");
+			} catch (ex) {
+				console.log("Failed to create cadescom.symmetricalgorithm: " + ex);
+				oStore.Close();
+				result.message = "Failed to create cadescom.symmetricalgorithm: " + ex;
+				return result;
+			}
+			oSymAlgo.ImportKey(oEncryptedData.encryptedSessionKey, oCertificate);
+			oSymAlgo.DiversData = oEncryptedData.sessionKeyDiversData;
+			var oSesssionKey = oSymAlgo.DiversifyKey();
+			oSesssionKey.IV = oEncryptedData.sessionKeyIV;
+			var sDecryptedData = oSesssionKey.Decrypt(oEncryptedData.dataEncrypted, 1);
+			var sData = Base64.decode(sDecryptedData);
+
+			result.message = sData;
+			result.success = true;
+			console.log("Data decrypted");
+		}
+		catch (ex) {
+			result.message = ex;
+			console.log(ex);
+		}
+
+		oStore.Close();
+
+		return result;
 	}
 
 	NETTRASH.SignText = function (sValue, sThumbprint, eResult) {
@@ -71,7 +196,7 @@
 				return;
 			}
 
-			var oCertificate = FindCertificateByThukbprint(oStore, sThumbprint);
+			var oCertificate = NETTRASH.FindCertificateByThumbprint(oStore, sThumbprint);
 			if (!oCertificate) return;
 
 			var oSigner = cadesplugin.CreateObject("CAdESCOM.CPSigner");
@@ -129,23 +254,73 @@
 		}
 	};
 
-	NETTRASH.EncryptText = function (sValue, sThumbprintSender, sThubprintReceiver, eResult) {
+	NETTRASH.EncryptText = function (sTextToEncrypt, sThumbprint, eResult) {
+
+		$(eResult).removeClass('success');
+		$(eResult).removeClass('error');
+
+		var oEncryptedData = NETTRASH.DoEncrypt(sTextToEncrypt, sThumbprint);
+		$(eResult).val(JSON.stringify(oEncryptedData));
+
+		if (oEncryptedData.success === true) {
+			$(eResult).addClass('success');
+		} else {
+			$(eResult).addClass('error');
+		}
 	}
 
-	function FindCertificateByThukbprint(oStore, sThumbprint) {
-		var nCertCount = oStore.Certificates.Count;
-		for (var i = 1; i <= nCertCount; i++) {
-			var oCertificate;
-			try {
-				oCertificate = oStore.Certificates.Item(i);
-			}
-			catch (ex) {
-				alert("Error while reading certificates: " + cadesplugin.getLastError(ex));
-				return;
-			}
-			if (oCertificate.Thumbprint === sThumbprint) break;
+	NETTRASH.DecryptText = function (oEncryptedData, sThumbprint, eResult) {
+
+		$(eResult).removeClass('success');
+		$(eResult).removeClass('error');
+
+		var oDecryptedData = NETTRASH.DoDecrypt(oEncryptedData, sThumbprint);
+
+		$(eResult).val(oDecryptedData.message);
+
+		if (oDecryptedData.success === true) {
+			$(eResult).addClass('success');
+		} else {
+			$(eResult).addClass('error');
 		}
-		return oCertificate;
+
+	}
+
+	NETTRASH.Exchange = function (sTextToExchange, sClientThumbprint, sServerThumbprint, eResult) {
+		$(eResult).removeClass('success');
+		$(eResult).removeClass('error');
+
+		var oEncryptedData = NETTRASH.DoEncrypt(sTextToExchange, sServerThumbprint);
+		console.log(JSON.stringify(oEncryptedData));
+
+		var oRequest = {
+			data: {
+				sessionKeyDiversData: oEncryptedData.sessionKeyDiversData,
+				sessionKeyIV: oEncryptedData.sessionKeyIV,
+				dataEncrypted: oEncryptedData.dataEncrypted,
+				encryptedSessionKey: oEncryptedData.encryptedSessionKey,
+				thumbprintCertificate: sServerThumbprint,
+				thumbprintAnswerCertificate: sClientThumbprint
+			}
+		};
+		$.post(NETTRASH.ExchangeUrl, oRequest)
+			.done(function (data) {
+				console.log(JSON.stringify(data));
+
+				var oDecryptedData = NETTRASH.DoDecrypt(data, sServerThumbprint);
+				$(eResult).val(oDecryptedData.message);
+
+				if (oDecryptedData.success === true) {
+					$(eResult).addClass('success');
+				} else {
+					$(eResult).addClass('error');
+				}
+			})
+			.fail(function (data) {
+				console.log("Exchange failed");
+				$(eResult).val("Exchange failed");
+				$(eResult).addClass('error');
+			});
 	}
 
 	var Base64 = {
@@ -279,4 +454,5 @@
 		}
 
 	}
+
 }(window.NETTRASH = window.NETTRASH || {}, jQuery));

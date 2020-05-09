@@ -3,7 +3,7 @@
 }
 
 <div class="jumbotron">
-	<h1>CryptoPro Web Example: Encrypt example</h1>
+	<h1>Encrypt example</h1>
 	<p class="lead">To use this app you must install a CryptoPro Plugin browser extension.</p>
 	<p><a href="https://www.cryptopro.ru/products/cades/plugin" target="_blank" class="btn btn-primary btn-lg">Click to Install &raquo;</a></p>
 </div>
@@ -12,24 +12,27 @@
 	<script type="text/javascript">
 		$(document).ready(function () {
 			NETTRASH.Initialize();
-			NETTRASH.FillCertificates($('#senderCertificte'));
-			NETTRASH.FillCertificates($('#receiverCertificte'));
+			NETTRASH.FillCertificates($('#certificate'));
     });
 	</script>
 }
 
 <div class="row">
-	<div class="col-md-8">
+	<div class="col-md-5">
 		<h3>Browser Encrypt Example</h3>
 		<form>
 			<div class="form-group">
-				<label class="form-control" for="senderCertificate">Sender:</label>
-				<select id="senderCertificte" class="form-control col-md-12"></select>
+				<div class="input-group">
+					<div class="input-group-addon">PUBLIC KEY</div>
+					<select id="certificate" class="form-control col-md-12"></select>
+				</div>
 			</div>
-			<select id="receiverCertificte" class="form-control col-md-12"></select>
 			<textarea id="textToEncrypt" class="form-control col-md-12" rows="10" placeholder="Some text to encrypt"></textarea>
-			<button type="button" class="btn btn-success col-md-12" onclick="NETTRASH.EncryptText($('#textToEncrypt').val(), $('#senderCertificte').val(), $('#receiverCertificte').val(), $('#encryptedText'))">Encrypt text</button>
+			<button type="button" class="btn btn-success col-md-12" onclick="NETTRASH.EncryptText($('#textToEncrypt').val(), $('#certificate').val(), $('#encryptedText'))">Encrypt text</button>
 		</form>
-		<textarea id="signedText" class="form-control col-md-12" rows="10" placeholder="Encrypted text" readonly></textarea>
+	</div>
+	<div class="col-md-7">
+		<h3>&nbsp;</h3>
+		<textarea id="encryptedText" class="form-control col-md-12" rows="20" placeholder="Encrypted text" readonly style="margin-top:-2px;"></textarea>
 	</div>
 </div>
