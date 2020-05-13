@@ -1,37 +1,115 @@
-﻿(function (m, $, undefined) {
+﻿; (function () {
+
+	if (window.NETTRASH)
+		return;
+
+	var canPromise = !!window.Promise;
+
+	var nettrash_reject;
+	var nettrash_resolve;
 
 	var isCryptoProPluginLoaded = false;
 	var isCryptoProPluginEnabled = false;
+	var isCryptoProAsyncEnabled = false;
+
+	var NETTRASH;
+
+	if (canPromise) {
+		NETTRASH = new Promise(function (resolve, reject) {
+			nettrash_resolve = resolve;
+			nettrash_reject = reject;
+		});
+	} else {
+		NETTRASH = {};
+	}
+
+	function initialization_done() {
+		if (canPromise) {
+			nettrash_resolve();
+		} else {
+			window.postMessage("nettrash_initialized", "*");
+		}
+	}
 
 	NETTRASH.Initialize = function () {
-		console.log("NETTRASH.Initialized");
-		try {
-			var oAbout = cadesplugin.CreateObject("CAdESCOM.About");
-			isCryptoProPluginLoaded = true;
-			isCryptoProPluginEnabled = true;
-			var oPluginVersion = oAbout.PluginVersion;
-			if (typeof (oPluginVersion) == "undefined")
-				oPluginVersion = oAbout.Version;
-			var oVersion = oAbout.CSPVersion("", 80);
-			var sCSPName = oAbout.CSPName(80);
-			console.log("Plugin Ver:" + oPluginVersion.MajorVersion + "." + oPluginVersion.MinorVersion + "." + oPluginVersion.BuildVersion);
-			console.log("CSP Ver:" + oVersion.MajorVersion + "." + oVersion.MinorVersion + "." + oVersion.BuildVersion);
-			console.log("CSP Name: " + sCSPName)
-		}
-		catch (oError) {
-			var mimetype = navigator.mimeTypes["application/x-cades"];
-			if (mimetype) {
+
+		function InitializePluginAsync() {
+			console.log("NETTRASH.Initialization: Async");
+			cadesplugin.async_spawn(function* () {
+				var oAbout = yield cadesplugin.CreateObjectAsync("CAdESCOM.About");
 				isCryptoProPluginLoaded = true;
-				var plugin = mimetype.enabledPlugin;
-				if (plugin) {
+				isCryptoProPluginEnabled = true;
+				var oPluginVersion = yield oAbout.PluginVersion;
+				if (typeof (oPluginVersion) == "undefined")
+					oPluginVersion = yield oAbout.Version;
+				var oVersion = yield oAbout.CSPVersion("", 80);
+				var sCSPName = yield oAbout.CSPName(80);
+				console.log("Plugin Ver:" + oPluginVersion.MajorVersion + "." + oPluginVersion.MinorVersion + "." + oPluginVersion.BuildVersion);
+				console.log("CSP Ver:" + oVersion.MajorVersion + "." + oVersion.MinorVersion + "." + oVersion.BuildVersion);
+				console.log("CSP Name: " + sCSPName)
+				console.log("NETTRASH.Initialization: Done");
+				initialization_done();
+			});
+		}
+
+		function InitializePlugin() {
+			isCryptoProAsyncEnabled = !!cadesplugin.CreateObjectAsync;
+
+			try {
+				if (isCryptoProAsyncEnabled) {
+
+					InitializePluginAsync();
+
+				} else {
+					var oAbout = cadesplugin.CreateObject("CAdESCOM.About");
+					isCryptoProPluginLoaded = true;
 					isCryptoProPluginEnabled = true;
+					var oPluginVersion = oAbout.PluginVersion;
+					if (typeof (oPluginVersion) == "undefined")
+						oPluginVersion = oAbout.Version;
+					var oVersion = oAbout.CSPVersion("", 80);
+					var sCSPName = oAbout.CSPName(80);
+					console.log("Plugin Ver:" + oPluginVersion.MajorVersion + "." + oPluginVersion.MinorVersion + "." + oPluginVersion.BuildVersion);
+					console.log("CSP Ver:" + oVersion.MajorVersion + "." + oVersion.MinorVersion + "." + oVersion.BuildVersion);
+					console.log("CSP Name: " + sCSPName)
+					console.log("NETTRASH.Initialization: Done");
+					initialization_done();
 				}
 			}
+			catch (oError) {
+				console.log(oError);
+				isCryptoProPluginLoaded = false;
+				isCryptoProPluginEnabled = false;
+				console.log("NETTRASH.Initialization: Failed");
+			}
 		}
-	};
+
+		console.log("NETTRASH.Initialization...");
+		if (canPromise) {
+			cadesplugin.then(
+				function () {
+					InitializePlugin();
+				},
+				function (oError) {
+					console.log(oError);
+				}
+			);
+		} else {
+			window.addEventListener("message", function (event) {
+				if (event.data == "cadesplugin_loaded") {
+					NETTRASH.InitializePlugin();
+				} else if (event.data == "cadesplugin_load_error") {
+					console.log("Plugin load fail");
+				}
+			},
+				false);
+			window.postMessage("cadesplugin_echo_request", "*");
+		}
+	}
 
 	NETTRASH.FillCertificates = function (eSelect) {
-		if (isCryptoProPluginEnabled) {
+
+		function FillCertificatesSync(eSelect) {
 			try {
 				var oStore = cadesplugin.CreateObject("CAdESCOM.Store");
 				oStore.Open();
@@ -56,6 +134,47 @@
 				$(eSelect).append(oItem);
 			}
 			oStore.Close();
+		}
+
+		function FillCertificatesAsync(eSelect) {
+			cadesplugin.async_spawn(function* () {
+				try {
+					var oStore = yield cadesplugin.CreateObjectAsync("CAdESCOM.Store");
+					yield oStore.Open();
+				}
+				catch (ex) {
+					console.log("Certificates Store My is not accessible");
+					return;
+				}
+
+				var oCertificates = yield oStore.Certificates;
+				var nCertCount = yield oCertificates.Count;
+				for (var i = 1; i <= nCertCount; i++) {
+					var oCertificate;
+					try {
+						oCertificate = yield oCertificates.Item(i);
+					}
+					catch (ex) {
+						alert("Error while reading certificates: " + cadesplugin.getLastError(ex));
+						return;
+					}
+					var sSubjectName = yield oCertificate.SubjectName;
+					var sThumbprint = yield oCertificate.Thumbprint;
+					var oItem = new Option(sSubjectName, sThumbprint);
+					oItem.text = sSubjectName;
+					$(eSelect).append(oItem);
+				}
+
+				yield oStore.Close();
+			});
+		}
+
+		if (isCryptoProPluginEnabled) {
+			if (isCryptoProAsyncEnabled) {
+				FillCertificatesAsync(eSelect);
+			} else {
+				FillCertificatesSync(eSelect);
+			}
 		}
 	}
 
@@ -233,81 +352,272 @@
 			return true;
 		}
 
+		function SignTextAsync(sDataToSign, sSignThumbprint, eResult) {
+			cadesplugin.async_spawn(function* () {
+				try {
+					var oStore = yield cadesplugin.CreateObjectAsync("CAdESCOM.Store");
+					yield oStore.Open();
+				}
+				catch (ex) {
+					console.log("Certificates store My is not accessible");
+					return;
+				}
+
+				var oCertificates = yield oStore.Certificates;
+				var nCertCount = yield oCertificates.Count;
+				for (var i = 1; i <= nCertCount; i++) {
+					var oCertificate;
+					try {
+						oCertificate = yield oCertificates.Item(i);
+					}
+					catch (ex) {
+						alert("Error while reading certificates: " + cadesplugin.getLastError(ex));
+						return;
+					}
+					var sThumbprint = yield oCertificate.Thumbprint;
+					if (sThumbprint === sSignThumbprint) break;
+				}
+
+				if (!oCertificate) return;
+
+				var oSigner = yield cadesplugin.CreateObjectAsync("CAdESCOM.CPSigner");
+				yield oSigner.propset_Certificate(oCertificate);
+				yield oSigner.propset_TSAAddress("http://cryptopro.ru/tsp/");
+				yield oSigner.propset_Options(cadesplugin.CAPICOM_CERTIFICATE_INCLUDE_WHOLE_CHAIN);
+
+				var oSignedData = yield cadesplugin.CreateObjectAsync("CAdESCOM.CadesSignedData");
+				yield oSignedData.propset_ContentEncoding(cadesplugin.CADESCOM_BASE64_TO_BINARY);
+				yield oSignedData.propset_Content(Base64.encode(sDataToSign));
+
+				try {
+					var sSignedMessage = yield oSignedData.SignCades(oSigner, cadesplugin.CADESCOM_CADES_BES);
+				} catch (oError) {
+					alert("Failed to create signature. Error: " + cadesplugin.getLastError(oError));
+					return;
+				}
+
+				yield oStore.Close();
+
+				$(eResult).val(sSignedMessage);
+
+				var bVerifyResult = true;
+
+				var oSignedData = yield cadesplugin.CreateObjectAsync("CAdESCOM.CadesSignedData");
+				oSignedData.ContentEncoding = cadesplugin.CADESCOM_BASE64_TO_BINARY;
+				try {
+					yield oSignedData.VerifyCades(sSignedMessage, cadesplugin.CADESCOM_CADES_BES, true);
+				} catch (err) {
+					alert("Failed to verify signature. Error: " + cadesplugin.getLastError(err));
+					bVerifyResult = false;
+				}
+
+				$(eResult).removeClass('success');
+				$(eResult).removeClass('error');
+				if (bVerifyResult) {
+					console.log("Signature verified");
+					$(eResult).addClass('success');
+				} else {
+					$(eResult).addClass('error');
+				}
+			});
+		}
+
 		console.log("SignText(" + sValue + ")")
 
 		if (isCryptoProPluginEnabled) {
-			var sSignedMessage = SignCreate(sThumbprint, sValue);
-
-			$(eResult).val(sSignedMessage);
-
-			var bVerifyResult = Verify(sSignedMessage);
-			$(eResult).removeClass('success');
-			$(eResult).removeClass('error');
-			if (bVerifyResult) {
-				console.log("Signature verified");
-				$(eResult).addClass('success');
+			if (isCryptoProAsyncEnabled) {
+				SignTextAsync(sValue, sThumbprint, eResult)
 			} else {
-				$(eResult).addClass('error');
+				var sSignedMessage = SignCreate(sThumbprint, sValue);
+
+				$(eResult).val(sSignedMessage);
+
+				var bVerifyResult = Verify(sSignedMessage);
+				$(eResult).removeClass('success');
+				$(eResult).removeClass('error');
+				if (bVerifyResult) {
+					console.log("Signature verified");
+					$(eResult).addClass('success');
+				} else {
+					$(eResult).addClass('error');
+				}
 			}
 		} else {
 			alert('Please install CryptoPro Plugin');
 		}
 	};
 
-	NETTRASH.EncryptText = function (sTextToEncrypt, sThumbprint, eResult) {
+	NETTRASH.EncryptText = function (sTextToEncrypt, sEncryptThumbprint, eResult) {
 
-		$(eResult).removeClass('success');
-		$(eResult).removeClass('error');
+		function EncryptTextAsync(sTextToEncrypt, sEncryptThumbprint, eResult) {
+			cadesplugin.async_spawn(function* () {
+				$(eResult).removeClass('success');
+				$(eResult).removeClass('error');
 
-		var oEncryptedData = NETTRASH.DoEncrypt(sTextToEncrypt, sThumbprint);
-		$(eResult).val(JSON.stringify(oEncryptedData));
+				var oEncryptedData = {
+					success: false,
+					sessionKeyDiversData: "",
+					sessionKeyIV: "",
+					dataEncrypted: "",
+					encryptedSessionKey: "",
+					errorMessage: ""
+				};
 
-		if (oEncryptedData.success === true) {
-			$(eResult).addClass('success');
-		} else {
-			$(eResult).addClass('error');
+				try {
+					var oStore = yield cadesplugin.CreateObjectAsync("CAdESCOM.Store");
+					yield oStore.Open();
+				}
+				catch (ex) {
+					console.log("Certificates store My is not accessible");
+					$(eResult).addClass('error');
+					return;
+				}
+
+				var oCertificates = yield oStore.Certificates;
+				var nCertCount = yield oCertificates.Count;
+				for (var i = 1; i <= nCertCount; i++) {
+					var oCertificate;
+					try {
+						oCertificate = yield oCertificates.Item(i);
+					}
+					catch (ex) {
+						alert("Error while reading certificates: " + cadesplugin.getLastError(ex));
+						return;
+					}
+					var sThumbprint = yield oCertificate.Thumbprint;
+					if (sThumbprint === sEncryptThumbprint) break;
+				}
+
+				var sDataToEncrypt = Base64.encode(sTextToEncrypt);
+
+				if (sDataToEncrypt === "") {
+					console.log("Empty data to encrypt");
+					oStore.Close();
+					result.errorMessage = "Empty data to encrypt";
+					return result;
+				}
+
+				try {
+					try {
+						var oSymAlgo = yield cadesplugin.CreateObjectAsync("cadescom.symmetricalgorithm");
+					} catch (oError) {
+						console.log("Failed to create cadescom.symmetricalgorithm: " + oError);
+						yield oStore.Close();
+						oEncryptedData.errorMessage = "Failed to create cadescom.symmetricalgorithm: " + oError;
+						$(eResult).val(JSON.stringify(oEncryptedData));
+						$(eResult).addClass('error');
+						return;
+					}
+
+					yield oSymAlgo.GenerateKey();
+
+					var oSessionKey = yield oSymAlgo.DiversifyKey();
+					oEncryptedData.sessionKeyDiversData = yield oSessionKey.DiversData;
+					oEncryptedData.sessionKeyIV = yield oSessionKey.IV;
+					oEncryptedData.dataEncrypted = yield oSessionKey.Encrypt(sDataToEncrypt, 1);
+					oEncryptedData.encryptedSessionKey = yield oSymAlgo.ExportKey(oCertificate);
+
+					oEncryptedData.success = true;
+					console.log("Data encrypted");
+				}
+				catch (oError) {
+					console.log(oError);
+					oEncryptedData.errorMessage = JSON.stringify(oError);
+				}
+
+				yield oStore.Close();
+
+				$(eResult).val(JSON.stringify(oEncryptedData));
+
+				if (oEncryptedData.success === true) {
+					$(eResult).addClass('success');
+				} else {
+					$(eResult).addClass('error');
+				}
+			});
 		}
-	}
 
-	NETTRASH.DecryptText = function (oEncryptedData, sThumbprint, eResult) {
-
-		$(eResult).removeClass('success');
-		$(eResult).removeClass('error');
-
-		var oDecryptedData = NETTRASH.DoDecrypt(oEncryptedData, sThumbprint);
-
-		$(eResult).val(oDecryptedData.message);
-
-		if (oDecryptedData.success === true) {
-			$(eResult).addClass('success');
+		if (isCryptoProAsyncEnabled) {
+			EncryptTextAsync(sTextToEncrypt, sEncryptThumbprint, eResult);
 		} else {
-			$(eResult).addClass('error');
-		}
+			$(eResult).removeClass('success');
+			$(eResult).removeClass('error');
 
-	}
+			var oEncryptedData = NETTRASH.DoEncrypt(sTextToEncrypt, sEncryptThumbprint);
+			$(eResult).val(JSON.stringify(oEncryptedData));
 
-	NETTRASH.Exchange = function (sTextToExchange, sClientThumbprint, sServerThumbprint, eResult) {
-		$(eResult).removeClass('success');
-		$(eResult).removeClass('error');
-
-		var oEncryptedData = NETTRASH.DoEncrypt(sTextToExchange, sServerThumbprint);
-		console.log(JSON.stringify(oEncryptedData));
-
-		var oRequest = {
-			data: {
-				sessionKeyDiversData: oEncryptedData.sessionKeyDiversData,
-				sessionKeyIV: oEncryptedData.sessionKeyIV,
-				dataEncrypted: oEncryptedData.dataEncrypted,
-				encryptedSessionKey: oEncryptedData.encryptedSessionKey,
-				thumbprintCertificate: sServerThumbprint,
-				thumbprintAnswerCertificate: sClientThumbprint
+			if (oEncryptedData.success === true) {
+				$(eResult).addClass('success');
+			} else {
+				$(eResult).addClass('error');
 			}
-		};
-		$.post(NETTRASH.ExchangeUrl, oRequest)
-			.done(function (data) {
-				console.log(JSON.stringify(data));
+		}
+	}
 
-				var oDecryptedData = NETTRASH.DoDecrypt(data, sServerThumbprint);
+	NETTRASH.DecryptText = function (oEncryptedData, sDecryptThumbprint, eResult) {
+
+		function DecryptTextAsync(oEncryptedData, sDecryptThumbprint, eResult) {
+			cadesplugin.async_spawn(function* () {
+				var oDecryptedData = {
+					success: false,
+					message: ""
+				};
+
+				try {
+					var oStore = yield cadesplugin.CreateObjectAsync("CAdESCOM.Store");
+					yield oStore.Open();
+				}
+				catch (ex) {
+					console.log("Certificates store My is not accessible");
+					$(eResult).addClass('error');
+					return;
+				}
+
+				var oCertificates = yield oStore.Certificates;
+				var nCertCount = yield oCertificates.Count;
+				for (var i = 1; i <= nCertCount; i++) {
+					var oCertificate;
+					try {
+						oCertificate = yield oCertificates.Item(i);
+					}
+					catch (ex) {
+						alert("Error while reading certificates: " + cadesplugin.getLastError(ex));
+						return;
+					}
+					var sThumbprint = yield oCertificate.Thumbprint;
+					if (sThumbprint === sDecryptThumbprint) break;
+				}
+
+				try {
+					try {
+						var oSymAlgo = yield cadesplugin.CreateObjectAsync("cadescom.symmetricalgorithm");
+					} catch (ex) {
+						console.log("Failed to create cadescom.symmetricalgorithm: " + ex);
+						yield oStore.Close();
+						oDecryptedData.message = "Failed to create cadescom.symmetricalgorithm: " + ex;
+						$(eResult).val(oDecryptedData.message);
+						$(eResult).addClass('error');
+						return;
+					}
+					
+					yield oSymAlgo.ImportKey(oEncryptedData.encryptedSessionKey, oCertificate);
+					yield oSymAlgo.propset_DiversData(oEncryptedData.sessionKeyDiversData);
+					var oSesssionKey = yield oSymAlgo.DiversifyKey();
+					yield oSesssionKey.propset_IV(oEncryptedData.sessionKeyIV);
+					var sDecryptedData = yield oSesssionKey.Decrypt(oEncryptedData.dataEncrypted, 1);
+					var sData = Base64.decode(sDecryptedData);
+
+					oDecryptedData.message = sData;
+					oDecryptedData.success = true;
+					console.log("Data decrypted");
+				}
+				catch (ex) {
+					oDecryptedData.message = ex;
+					console.log(ex);
+				}
+
+				oStore.Close();
+
 				$(eResult).val(oDecryptedData.message);
 
 				if (oDecryptedData.success === true) {
@@ -315,12 +625,227 @@
 				} else {
 					$(eResult).addClass('error');
 				}
-			})
-			.fail(function (data) {
-				console.log("Exchange failed");
-				$(eResult).val("Exchange failed");
-				$(eResult).addClass('error');
 			});
+		}
+
+		if (isCryptoProAsyncEnabled) {
+			DecryptTextAsync(oEncryptedData, sDecryptThumbprint, eResult);
+		} else {
+			$(eResult).removeClass('success');
+			$(eResult).removeClass('error');
+
+			var oDecryptedData = NETTRASH.DoDecrypt(oEncryptedData, sDecryptThumbprint);
+
+			$(eResult).val(oDecryptedData.message);
+
+			if (oDecryptedData.success === true) {
+				$(eResult).addClass('success');
+			} else {
+				$(eResult).addClass('error');
+			}
+		}
+	}
+
+	NETTRASH.Exchange = function (sTextToExchange, sClientThumbprint, sServerThumbprint, eResult) {
+
+		function decryptAsync(oEncryptedData, sDecryptThumbprint) {
+			cadesplugin.async_spawn(function* () {
+				var oDecryptedData = {
+					success: false,
+					message: ""
+				};
+
+				try {
+					var oStore = yield cadesplugin.CreateObjectAsync("CAdESCOM.Store");
+					yield oStore.Open();
+				}
+				catch (ex) {
+					console.log("Certificates store My is not accessible");
+					$(eResult).addClass('error');
+					return;
+				}
+
+				var oCertificates = yield oStore.Certificates;
+				var nCertCount = yield oCertificates.Count;
+				for (var i = 1; i <= nCertCount; i++) {
+					var oCertificate;
+					try {
+						oCertificate = yield oCertificates.Item(i);
+					}
+					catch (ex) {
+						alert("Error while reading certificates: " + cadesplugin.getLastError(ex));
+						return;
+					}
+					var sThumbprint = yield oCertificate.Thumbprint;
+					if (sThumbprint === sDecryptThumbprint) break;
+				}
+
+				try {
+					try {
+						var oSymAlgo = yield cadesplugin.CreateObjectAsync("cadescom.symmetricalgorithm");
+					} catch (ex) {
+						console.log("Failed to create cadescom.symmetricalgorithm: " + ex);
+						yield oStore.Close();
+						oDecryptedData.message = "Failed to create cadescom.symmetricalgorithm: " + ex;
+						$(eResult).val(oDecryptedData.message);
+						$(eResult).addClass('error');
+						return;
+					}
+
+					yield oSymAlgo.ImportKey(oEncryptedData.encryptedSessionKey, oCertificate);
+					yield oSymAlgo.propset_DiversData(oEncryptedData.sessionKeyDiversData);
+					var oSesssionKey = yield oSymAlgo.DiversifyKey();
+					yield oSesssionKey.propset_IV(oEncryptedData.sessionKeyIV);
+					var sDecryptedData = yield oSesssionKey.Decrypt(oEncryptedData.dataEncrypted, 1);
+					var sData = Base64.decode(sDecryptedData);
+
+					oDecryptedData.message = sData;
+					oDecryptedData.success = true;
+					console.log("Data decrypted");
+				}
+				catch (ex) {
+					oDecryptedData.message = ex;
+					console.log(ex);
+				}
+
+				oStore.Close();
+
+				$(eResult).val(oDecryptedData.message);
+
+				if (oDecryptedData.success === true) {
+					$(eResult).addClass('success');
+				} else {
+					$(eResult).addClass('error');
+				}
+			});
+		}
+
+		function exchange() {
+			var oRequest = {
+				data: {
+					sessionKeyDiversData: oEncryptedData.sessionKeyDiversData,
+					sessionKeyIV: oEncryptedData.sessionKeyIV,
+					dataEncrypted: oEncryptedData.dataEncrypted,
+					encryptedSessionKey: oEncryptedData.encryptedSessionKey,
+					thumbprintCertificate: sServerThumbprint,
+					thumbprintAnswerCertificate: sClientThumbprint
+				}
+			};
+			$.post(NETTRASH.ExchangeUrl, oRequest)
+				.done(function (data) {
+					console.log(JSON.stringify(data));
+
+					if (isCryptoProAsyncEnabled) {
+						decryptAsync(data, sServerThumbprint);
+					} else {
+						var oDecryptedData = NETTRASH.DoDecrypt(data, sServerThumbprint);
+						$(eResult).val(oDecryptedData.message);
+
+						if (oDecryptedData.success === true) {
+							$(eResult).addClass('success');
+						} else {
+							$(eResult).addClass('error');
+						}
+					}
+				})
+				.fail(function (data) {
+					console.log("Exchange failed");
+					$(eResult).val("Exchange failed");
+					$(eResult).addClass('error');
+				});
+		}
+
+		function encryptAsync(sTextToExchange, sServerThumbprint) {
+			cadesplugin.async_spawn(function* () {
+				oEncryptedData = {
+					success: false,
+					sessionKeyDiversData: "",
+					sessionKeyIV: "",
+					dataEncrypted: "",
+					encryptedSessionKey: "",
+					errorMessage: ""
+				};
+
+				try {
+					var oStore = yield cadesplugin.CreateObjectAsync("CAdESCOM.Store");
+					yield oStore.Open();
+				}
+				catch (ex) {
+					console.log("Certificates store My is not accessible");
+					$(eResult).addClass('error');
+					return;
+				}
+
+				var oCertificates = yield oStore.Certificates;
+				var nCertCount = yield oCertificates.Count;
+				for (var i = 1; i <= nCertCount; i++) {
+					var oCertificate;
+					try {
+						oCertificate = yield oCertificates.Item(i);
+					}
+					catch (ex) {
+						alert("Error while reading certificates: " + cadesplugin.getLastError(ex));
+						return;
+					}
+					var sThumbprint = yield oCertificate.Thumbprint;
+					if (sThumbprint === sServerThumbprint) break;
+				}
+
+				var sDataToEncrypt = Base64.encode(sTextToExchange);
+
+				if (sDataToEncrypt === "") {
+					console.log("Empty data to encrypt");
+					oStore.Close();
+					result.errorMessage = "Empty data to encrypt";
+					return result;
+				}
+
+				try {
+					try {
+						var oSymAlgo = yield cadesplugin.CreateObjectAsync("cadescom.symmetricalgorithm");
+					} catch (oError) {
+						console.log("Failed to create cadescom.symmetricalgorithm: " + oError);
+						yield oStore.Close();
+						oEncryptedData.errorMessage = "Failed to create cadescom.symmetricalgorithm: " + oError;
+						$(eResult).val(JSON.stringify(oEncryptedData));
+						$(eResult).addClass('error');
+						return;
+					}
+
+					yield oSymAlgo.GenerateKey();
+
+					var oSessionKey = yield oSymAlgo.DiversifyKey();
+					oEncryptedData.sessionKeyDiversData = yield oSessionKey.DiversData;
+					oEncryptedData.sessionKeyIV = yield oSessionKey.IV;
+					oEncryptedData.dataEncrypted = yield oSessionKey.Encrypt(sDataToEncrypt, 1);
+					oEncryptedData.encryptedSessionKey = yield oSymAlgo.ExportKey(oCertificate);
+
+					oEncryptedData.success = true;
+					console.log("Data encrypted");
+				}
+				catch (oError) {
+					console.log(oError);
+					oEncryptedData.errorMessage = JSON.stringify(oError);
+				}
+
+				yield oStore.Close();
+
+				exchange();
+			});
+		}
+
+		$(eResult).removeClass('success');
+		$(eResult).removeClass('error');
+
+		var oEncryptedData;
+
+		if (isCryptoProAsyncEnabled) {
+			encryptAsync(sTextToExchange, sServerThumbprint);
+		} else {
+			oEncryptedData = NETTRASH.DoEncrypt(sTextToExchange, sServerThumbprint);
+			console.log(JSON.stringify(oEncryptedData));
+			exchange();
+		}
 	}
 
 	var Base64 = {
@@ -455,4 +980,5 @@
 
 	}
 
-}(window.NETTRASH = window.NETTRASH || {}, jQuery));
+	window.NETTRASH = NETTRASH;
+}());

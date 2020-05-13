@@ -11,9 +11,27 @@
 @section Scripts {
 	<script type="text/javascript">
 		$(document).ready(function () {
+			var canPromise = !!window.Promise;
+			if (canPromise) {
+				NETTRASH.then(
+					function () {
+						NETTRASH.FillCertificates($('#certificate'));
+					},
+					function (oError) {
+						console.log(oError);
+					}
+				);
+			} else {
+				window.addEventListener("message", function (event) {
+					if (event.data == "nettrash_initialized") {
+						NETTRASH.FillCertificates($('#certificate'));
+					} else if (event.data == "nettrash_initialization_error") {
+						console.log("Error loading NETTRASH :)");
+					}
+				}, false);
+			}
 			NETTRASH.Initialize();
-			NETTRASH.FillCertificates($('#certificate'));
-    });
+		});
 	</script>
 }
 

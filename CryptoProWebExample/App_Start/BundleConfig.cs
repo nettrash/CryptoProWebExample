@@ -12,14 +12,12 @@ namespace CryptoProWebExample
 						"~/Scripts/jquery-{version}.js"));
 
 			bundles.Add(new ScriptBundle("~/bundles/main").Include(
+						"~/Scripts/es6-promise.min.js",
+						"~/Scripts/cadesplugin_api.js",
 						"~/Scripts/Site.js"));
 
 			bundles.Add(new ScriptBundle("~/bundles/jqueryval").Include(
 						"~/Scripts/jquery.validate*"));
-
-			bundles.Add(new ScriptBundle("~/bundles/cryptopro").Include(
-						"~/Scripts/es6-promise.min.js",
-						"~/Scripts/cadesplugin_api.js"));
 
 			bundles.Add(new ScriptBundle("~/bundles/modernizr").Include(
 						"~/Scripts/modernizr-*"));

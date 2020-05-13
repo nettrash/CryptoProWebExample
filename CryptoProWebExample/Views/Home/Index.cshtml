@@ -11,8 +11,26 @@
 @section Scripts {
 	<script type="text/javascript">
 		$(document).ready(function () {
+			var canPromise = !!window.Promise;
+			if (canPromise) {
+				NETTRASH.then(
+					function () {
+						NETTRASH.FillCertificates($('#certificateToSign'));
+					},
+					function (oError) {
+						console.log(oError);
+					}
+				);
+			} else {
+				window.addEventListener("message", function (event) {
+					if (event.data == "nettrash_initialized") {
+						NETTRASH.FillCertificates($('#certificateToSign'));
+					} else if (event.data == "nettrash_initialization_error") {
+						console.log("Error loading NETTRASH :)");
+					}
+				}, false);
+			}
 			NETTRASH.Initialize();
-			NETTRASH.FillCertificates($('#certificateToSign'));
     });
 	</script>
 }
@@ -27,7 +45,7 @@
 		</form>
 	</div>
 	<div class="col-md-7">
-		<h3>&nbsp</h3>
+		<h3>&nbsp;</h3>
 		<textarea id="signedText" class="form-control col-md-12" rows="16" placeholder="Sign text result" readonly></textarea>
 	</div>
 </div>

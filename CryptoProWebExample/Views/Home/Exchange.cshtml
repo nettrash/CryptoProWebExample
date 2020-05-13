@@ -12,10 +12,29 @@
 	<script type="text/javascript">
 		$(document).ready(function () {
 			NETTRASH.ExchangeUrl = '@Url.Action("DoExchange")';
+			var canPromise = !!window.Promise;
+			if (canPromise) {
+				NETTRASH.then(
+					function () {
+						NETTRASH.FillCertificates($('#clientCertificate'));
+						NETTRASH.FillCertificates($('#serverCertificate'));
+					},
+					function (oError) {
+						console.log(oError);
+					}
+				);
+			} else {
+				window.addEventListener("message", function (event) {
+					if (event.data == "nettrash_initialized") {
+						NETTRASH.FillCertificates($('#clientCertificate'));
+						NETTRASH.FillCertificates($('#serverCertificate'));
+					} else if (event.data == "nettrash_initialization_error") {
+						console.log("Error loading NETTRASH :)");
+					}
+				}, false);
+			}
 			NETTRASH.Initialize();
-			NETTRASH.FillCertificates($('#clientCertificate'));
-			NETTRASH.FillCertificates($('#serverCertificate'));
-    });
+		});
 	</script>
 }
 
