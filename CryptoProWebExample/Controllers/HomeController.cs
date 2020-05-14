@@ -27,6 +27,8 @@ namespace CryptoProWebExample.Controllers
 		[HttpPost]
 		public ActionResult DoExchange(EncryptedDataModel data)
 		{
+			string sMessage = System.Text.Encoding.Unicode.GetString(data.GetMessage());
+			data.EncryptAnswer(System.Text.Encoding.Unicode.GetBytes($"answer: {sMessage}"));
 			return Json(data);
 		}
 	}

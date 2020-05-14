@@ -1,4 +1,10 @@
-﻿using System.Security.Cryptography.X509Certificates;
+﻿using CryptoPro.Sharpei;
+using System;
+using System.Collections;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Security.Cryptography.Pkcs;
+using System.Security.Cryptography.X509Certificates;
 
 namespace CryptoProWebExample.Models
 {
@@ -40,6 +46,26 @@ namespace CryptoProWebExample.Models
 			return retVal;
 		}
 
+		private static byte[] TrimArray(byte[] targetArray)
+		{
+			IEnumerator enum1 = targetArray.GetEnumerator();
+			int i = 0;
+			while (enum1.MoveNext())
+			{
+				if (enum1.Current.ToString().Equals("0"))
+				{
+					break;
+				}
+				i++;
+			}
+			byte[] returnedArray = new byte[i];
+			for (int j = 0; j < i; j++)
+			{
+				returnedArray[j] = targetArray[j];
+			}
+			return returnedArray;
+		}
+
 
 
 		#endregion
@@ -59,8 +85,28 @@ namespace CryptoProWebExample.Models
 
 		public byte[] GetMessage()
 		{
-			byte[] retVal = null;
-			return retVal;
+			EnvelopedCms envelopedCms = new EnvelopedCms();
+			envelopedCms.Decode(Convert.FromBase64String(dataEncrypted));
+			envelopedCms.Decrypt(envelopedCms.RecipientInfos[0]);
+			return envelopedCms.ContentInfo.Content;
+		}
+
+		public void EncryptAnswer(byte[] answerData)
+		{
+			X509Certificate2 certificate = GetAnswerCertificate();
+
+			ContentInfo contentInfo = new ContentInfo(answerData);
+			EnvelopedCms envelopedCms = new EnvelopedCms(contentInfo);
+			CmsRecipient recipient = new CmsRecipient(
+				SubjectIdentifierType.IssuerAndSerialNumber,
+				certificate);
+			envelopedCms.Encrypt(recipient);
+			byte[] answer = envelopedCms.Encode();
+
+			dataEncrypted = Convert.ToBase64String(answer);
+			sessionKeyIV = String.Empty;
+			sessionKeyDiversData = String.Empty;
+			encryptedSessionKey = String.Empty;
 		}
 
 
