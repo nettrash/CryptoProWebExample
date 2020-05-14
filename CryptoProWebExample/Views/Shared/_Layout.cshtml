@@ -39,6 +39,9 @@
     @Scripts.Render("~/bundles/jquery")
     @Scripts.Render("~/bundles/bootstrap")
     @Scripts.Render("~/bundles/main")
+    <script type="text/javascript">
+            var SiteAsyncUrl = "@Url.Content("~/Scripts/SiteAsync.js")";
+    </script>
     @RenderSection("scripts", required: false)
 </body>
 </html>
